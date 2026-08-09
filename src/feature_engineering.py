@@ -28,18 +28,18 @@ def route_feature_engineering(data):
             data['delivery_lat'], data['delivery_lon']
         )
     elif 'distance' in data.columns:
-        # Koordinat yoksa geo_distance yerine karayolu mesafesini (distance) kullan
+        # If the coordinates are not available:
         data['geo_distance'] = data['distance']
     else:
         data['geo_distance'] = 0.0
 
-    # 2. ADIM: route_complexity Hesaplama
+    # calculate route complexity
     if 'distance' in data.columns and 'geo_distance' in data.columns:
         data['route_complexity'] = data['distance'] / (data['geo_distance'] + 1e-5)
     else:
         data['route_complexity'] = 1.0
 
-    # 3. ADIM: route_id Oluşturma
+    # 3. route id creation
     if 'pickup' in data.columns and 'delivery' in data.columns:
         data['route_id'] = data['pickup'].astype(str) + '_' + data['delivery'].astype(str)
 

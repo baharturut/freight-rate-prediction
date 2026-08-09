@@ -1,4 +1,6 @@
 import warnings
+from typing import Optional
+
 import lightgbm as lgb
 import numpy as np
 import optuna
@@ -38,11 +40,14 @@ def optuna_hyperparameter_tuning(X_train: pd.DataFrame,
         }
 
         model = lgb.LGBMRegressor(**params, n_estimators=1000)
-        model.fit(X_train, y_train_log, 
-                  eval_set=[(X_valid, y_valid_log)], 
-                  callbacks=[lgb.early_stopping(stopping_rounds=30, verbose=False)]),
+        model.fit(
+            X_train,
+            y_train_log,
+            eval_set=[(X_valid, y_valid_log)],
+            callbacks=[lgb.early_stopping(stopping_rounds=30, verbose=False)]
+        )
 
-        predictions_log = model.predict(X_valid)
+        predictions_log = np.asarray(model.predict(X_valid), dtype=float)
         predictions_exp = np.clip(np.expm1(predictions_log), a_min=0, a_max=None)  # Ensure no negative predictions
         return np.sqrt(mean_squared_error(y_valid, predictions_exp))
 
@@ -64,9 +69,9 @@ def optuna_hyperparameter_tuning(X_train: pd.DataFrame,
 
 def train_lgbm_model(X_train: pd.DataFrame, 
                      y_train: pd.Series, 
-                     X_valid: pd.DataFrame = None, 
-                     y_valid: pd.Series = None, 
-                     params: dict = None) -> lgb.LGBMRegressor:
+                     X_valid: Optional[pd.DataFrame] = None,
+                     y_valid: Optional[pd.Series] = None,
+                     params: Optional[dict] = None) -> lgb.LGBMRegressor:
 
     if params is None:
         params = {
@@ -97,18 +102,20 @@ def train_lgbm_model(X_train: pd.DataFrame,
 
 def predict_rates(model: lgb.LGBMRegressor, X_test: pd.DataFrame, train_columns: list) -> np.ndarray:
     X_aligned = X_test.reindex(columns=train_columns, fill_value=0)
-    preds_log = model.predict(X_aligned)
+    preds_log = np.asarray(model.predict(X_aligned), dtype=float)
     preds_exp = np.clip(np.expm1(preds_log), a_min=0, a_max=None)  # Ensure no negative predictions
     return preds_exp
 
-def evaluation(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
-    
-    mae = mean_absolute_error(y_true, y_pred)
-    rmse = np.sqrt(mean_squared_error(y_true, y_pred))
-    r2 = r2_score(y_true, y_pred)
+def evaluation(y_true: pd.Series | np.ndarray, y_pred: np.ndarray) -> dict:
+    y_true_array = np.asarray(y_true, dtype=float)
+    y_pred_array = np.asarray(y_pred, dtype=float)
+
+    mae = mean_absolute_error(y_true_array, y_pred_array)
+    rmse = np.sqrt(mean_squared_error(y_true_array, y_pred_array))
+    r2 = r2_score(y_true_array, y_pred_array)
 
     print(f"Evaluation Metrics:\nMAE: {mae:.4f}\nRMSE: {rmse:.4f}\nR2: {r2:.4f}")
-    
+
     return {
         'MAE': mae,
         'RMSE': rmse,
